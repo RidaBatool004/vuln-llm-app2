@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXA AI Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <div class="logo-icon">N</div>
+                <span class="logo-text">NEXA</span>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="/" class="nav-item">
+                <i data-lucide="layout-dashboard"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="/assistant.html" class="nav-item active">
+                <i data-lucide="bot"></i>
+                <span>AI Assistant</span>
+            </a>
+            <a href="/customers.html" class="nav-item">
+                <i data-lucide="users"></i>
+                <span>Customers</span>
+            </a>
+            <a href="/settings.html" class="nav-item">
+                <i data-lucide="settings"></i>
+                <span>Settings</span>
+            </a>
+        </nav>
+    </aside>
+    <main class="main-content chat-page">
+        <header class="page-header">
+            <div>
+                <h1 class="page-title">NEXA AI</h1>
+                <p class="page-subtitle">Your intelligent customer operations assistant</p>
+            </div>
+            <div class="online-indicator">
+                <span class="online-dot"></span>
+                <span>Online</span>
+            </div>
+        </header>
+        <div class="chat-container">
+            <div class="chat-messages" id="chatMessages">
+                <div class="message ai-message">
+                    <div class="message-avatar ai-avatar">N</div>
+                    <div class="message-content">
+                        <p>Hi! I'm NEXA AI. I can help you find customer information, check orders, and review support tickets.</p>
+                    </div>
+                </div>
+                <div class="suggested-prompts">
+                    <button class="prompt-btn" onclick="sendPrompt(this)">What's the status of order #1042?</button>
+                    <button class="prompt-btn" onclick="sendPrompt(this)">Show me Sarah Khan's recent tickets</button>
+                    <button class="prompt-btn" onclick="sendPrompt(this)">Find customers with pending orders</button>
+                    <button class="prompt-btn" onclick="sendPrompt(this)">Create a new ticket for customer #1 about delivery delay</button>
+                </div>
+            </div>
+            <div class="chat-input-area">
+                <div class="chat-input-wrapper">
+                    <input type="text" id="chatInput" class="chat-input" placeholder="Ask NEXA anything..." onkeydown="if(event.key==='Enter')sendMessage()">
+                    <button class="send-btn" onclick="sendMessage()">
+                        <i data-lucide="send"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script src="/static/app.js"></script>
+    <script>
+        const chatMessages = document.getElementById('chatMessages');
+        const chatInput = document.getElementById('chatInput');
+        const SESSION_KEY = 'nexa_chat_history';
+        const SESSION_API_KEY = 'nexa_chat_api_history';
+        let apiHistory = [];
+
+        const TOOL_LABELS = {
+            'search_customers': 'Searching for customers...',
+            'get_customer': 'Looking up customer information...',
+            'get_order': 'Checking order information...',
+            'get_ticket': 'Looking up ticket information...',
+            'search_tickets': 'Searching support tickets...',
+            'update_ticket_status': 'Updating ticket status...',
+            'add_internal_note': 'Adding internal note...',
+            'assign_ticket': 'Assigning ticket...'
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            restoreSession();
+        });
+
+        function saveSession() {
+            const messages = [];
+            chatMessages.querySelectorAll('.message:not(.tool-activity)').forEach(el => {
+                const type = el.classList.contains('user-message') ? 'user' : 'ai';
+                const text = el.querySelector('.message-content p');
+                if (text) messages.push({ type, text: text.textContent });
+            });
+            sessionStorage.setItem(SESSION_KEY, JSON.stringify(messages));
+            sessionStorage.setItem(SESSION_API_KEY, JSON.stringify(apiHistory));
+        }
+
+        function restoreSession() {
+            const saved = sessionStorage.getItem(SESSION_KEY);
+            const savedApi = sessionStorage.getItem(SESSION_API_KEY);
+            if (saved) {
+                const messages = JSON.parse(saved);
+                const prompts = document.querySelector('.suggested-prompts');
+                if (prompts) prompts.remove();
+                chatMessages.innerHTML = '';
+                messages.forEach(m => appendMessage(m.type, m.text));
+            }
+            if (savedApi) {
+                apiHistory = JSON.parse(savedApi);
+            }
+        }
+
+        function sendPrompt(btn) {
+            chatInput.value = btn.textContent;
+            sendMessage();
+        }
+
+        async function sendMessage() {
+            const text = chatInput.value.trim();
+            if (!text) return;
+
+            chatInput.value = '';
+
+            const prompts = document.querySelector('.suggested-prompts');
+            if (prompts) prompts.remove();
+
+            appendMessage('user', text);
+
+            apiHistory.push({ role: 'user', content: text });
+
+            const loadingId = appendMessage('ai', 'Thinking...', true);
+
+            try {
+                const res = await apiFetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text, history: apiHistory.slice(0, -1) }),
+                });
+
+                removeMessage(loadingId);
+
+                if (res.tools_used && res.tools_used.length > 0) {
+                    for (const tool of res.tools_used) {
+                        const label = TOOL_LABELS[tool] || 'Processing...';
+                        const toolMsgId = appendToolActivity(label);
+                        await delay(300);
+                        removeMessage(toolMsgId);
+                    }
+                }
+
+                appendMessage('ai', res.response);
+
+                apiHistory.push({ role: 'assistant', content: res.response });
+
+                saveSession();
+            } catch (err) {
+                removeMessage(loadingId);
+                appendMessage('ai', 'Sorry, something went wrong. Please try again.');
+                apiHistory.pop();
+                saveSession();
+            }
+        }
+
+        let msgCounter = 0;
+        function appendMessage(type, text) {
+            const id = 'msg-' + (++msgCounter);
+            const div = document.createElement('div');
+            div.id = id;
+            div.className = `message ${type === 'user' ? 'user-message' : 'ai-message'}`;
+
+            const avatar = type === 'user' ? 'U' : 'N';
+            const avatarClass = type === 'user' ? 'user-avatar' : 'ai-avatar';
+
+            div.innerHTML = `
+                <div class="message-avatar ${avatarClass}">${avatar}</div>
+                <div class="message-content">
+                    <p>${escapeHtml(text)}</p>
+                </div>
+            `;
+
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            return id;
+        }
+
+        function appendToolActivity(text) {
+            const id = 'msg-' + (++msgCounter);
+            const div = document.createElement('div');
+            div.id = id;
+            div.className = 'message tool-activity';
+
+            div.innerHTML = `
+                <div class="message-avatar ai-avatar">N</div>
+                <div class="message-content loading-text">
+                    <p><span class="tool-spinner"></span>${escapeHtml(text)}</p>
+                </div>
+            `;
+
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            return id;
+        }
+
+        function removeMessage(id) {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+    </script>
+</body>
+</html>
