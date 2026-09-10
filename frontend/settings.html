@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXA AI Support - Settings</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <div class="logo-icon">N</div>
+                <span class="logo-text">NEXA</span>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="/" class="nav-item">
+                <i data-lucide="layout-dashboard"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="/assistant.html" class="nav-item">
+                <i data-lucide="bot"></i>
+                <span>AI Assistant</span>
+            </a>
+            <a href="/customers.html" class="nav-item">
+                <i data-lucide="users"></i>
+                <span>Customers</span>
+            </a>
+            <a href="/settings.html" class="nav-item active">
+                <i data-lucide="settings"></i>
+                <span>Settings</span>
+            </a>
+        </nav>
+    </aside>
+    <main class="main-content">
+        <header class="page-header">
+            <div>
+                <h1 class="page-title">Settings</h1>
+                <p class="page-subtitle">Application configuration and workspace information.</p>
+            </div>
+        </header>
+        <div class="settings-grid">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Workspace</h2>
+                </div>
+                <div class="card-body">
+                    <div class="setting-item">
+                        <span class="setting-label">Workspace Name</span>
+                        <span class="setting-value">NEXA AI Support</span>
+                    </div>
+                    <div class="setting-item">
+                        <span class="setting-label">Customers</span>
+                        <span class="setting-value" id="customerCount">Loading...</span>
+                    </div>
+                    <div class="setting-item">
+                        <span class="setting-label">Tickets</span>
+                        <span class="setting-value" id="ticketCount">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">AI Assistant</h2>
+                </div>
+                <div class="card-body">
+                    <div class="setting-item">
+                        <span class="setting-label">Provider</span>
+                        <span class="setting-value">Groq</span>
+                    </div>
+                    <div class="setting-item">
+                        <span class="setting-label">Model</span>
+                        <span class="setting-value">openai/gpt-oss-20b</span>
+                    </div>
+                    <div class="setting-item">
+                        <span class="setting-label">Status</span>
+                        <span class="setting-value"><span class="status status-active">Active</span></span>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Application</h2>
+                </div>
+                <div class="card-body">
+                    <div class="setting-item">
+                        <span class="setting-label">Environment</span>
+                        <span class="setting-value">Local Development</span>
+                    </div>
+                    <div class="setting-item">
+                        <span class="setting-label">Backend</span>
+                        <span class="setting-value">FastAPI</span>
+                    </div>
+                    <div class="setting-item">
+                        <span class="setting-label">Database</span>
+                        <span class="setting-value">SQLite</span>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Demo Environment</h2>
+                </div>
+                <div class="card-body">
+                    <p class="setting-description">Restore the original demo dataset for repeated security demonstrations.</p>
+                    <button class="btn-reset" id="resetBtn" onclick="resetDemo()">Reset Demo Data</button>
+                    <p class="setting-note" id="resetMessage"></p>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Security Context</h2>
+                </div>
+                <div class="card-body">
+                    <p class="setting-description">AI Architecture Security Considerations</p>
+                    <div class="setting-item">
+                        <span class="setting-label">LLM01: Prompt Injection</span>
+                        <span class="setting-value">Untrusted customer-controlled content can enter the model context through support tickets.</span>
+                    </div>
+                    <div class="setting-item">
+                        <span class="setting-label">LLM02: Sensitive Information Disclosure</span>
+                        <span class="setting-value">Over-permissive data retrieval can expose sensitive fields to the model without field-level authorization.</span>
+                    </div>
+                    <div class="setting-item">
+                        <span class="setting-label">LLM06: Excessive Agency</span>
+                        <span class="setting-value">AI-controlled tools can perform consequential actions without sufficient authorization or human oversight.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script src="/static/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            lucide.createIcons();
+            await loadSettings();
+        });
+
+        async function loadSettings() {
+            try {
+                const [customers, tickets] = await Promise.all([
+                    apiFetch('/api/customers'),
+                    apiFetch('/api/tickets')
+                ]);
+                document.getElementById('customerCount').textContent = customers.length;
+                document.getElementById('ticketCount').textContent = tickets.length;
+            } catch (err) {
+                console.error('Failed to load settings:', err);
+                document.getElementById('customerCount').textContent = '-';
+                document.getElementById('ticketCount').textContent = '-';
+            }
+        }
+
+        async function resetDemo() {
+            const btn = document.getElementById('resetBtn');
+            const msg = document.getElementById('resetMessage');
+            btn.disabled = true;
+            btn.textContent = 'Resetting...';
+            msg.textContent = '';
+
+            try {
+                await apiFetch('/api/demo/reset', { method: 'POST' });
+                msg.textContent = 'Demo data reset successfully.';
+                msg.className = 'setting-note success';
+                await loadSettings();
+            } catch (err) {
+                msg.textContent = 'Failed to reset demo data.';
+                msg.className = 'setting-note error';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Reset Demo Data';
+            }
+        }
+    </script>
+</body>
+</html>
