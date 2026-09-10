@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXA AI Support</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <div class="logo-icon">N</div>
+                <span class="logo-text">NEXA</span>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="/" class="nav-item active">
+                <i data-lucide="layout-dashboard"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="/assistant.html" class="nav-item">
+                <i data-lucide="bot"></i>
+                <span>AI Assistant</span>
+            </a>
+            <a href="/customers.html" class="nav-item">
+                <i data-lucide="users"></i>
+                <span>Customers</span>
+            </a>
+            <a href="/settings.html" class="nav-item">
+                <i data-lucide="settings"></i>
+                <span>Settings</span>
+            </a>
+        </nav>
+    </aside>
+    <main class="main-content">
+        <header class="page-header">
+            <div>
+                <h1 class="page-title">Good morning</h1>
+                <p class="page-subtitle">Here's what's happening with your customer support today.</p>
+            </div>
+        </header>
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-icon blue"><i data-lucide="ticket"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="openTickets">-</span>
+                    <span class="stat-label">Open Tickets</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon yellow"><i data-lucide="clock"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="pending">-</span>
+                    <span class="stat-label">Pending</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon red"><i data-lucide="alert-triangle"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="escalated">-</span>
+                    <span class="stat-label">Escalated</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon green"><i data-lucide="check-circle"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="resolved">-</span>
+                    <span class="stat-label">Resolved Today</span>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Recent Tickets</h2>
+                <a href="/customers.html" class="card-link">View all</a>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ticket</th>
+                            <th>Customer</th>
+                            <th>Subject</th>
+                            <th>Priority</th>
+                            <th>Status</th>
+                            <th>Updated</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ticketsBody">
+                        <tr><td colspan="6" class="loading">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+    <script src="/static/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            lucide.createIcons();
+            await loadDashboard();
+        });
+
+        async function loadDashboard() {
+            try {
+                const tickets = await apiFetch('/api/tickets');
+                const customers = await apiFetch('/api/customers');
+
+                const customerMap = {};
+                customers.forEach(c => { customerMap[c.id] = c.name; });
+
+                const openCount = tickets.filter(t => t.status === 'open').length;
+                const pendingCount = tickets.filter(t => t.status === 'pending').length;
+                const escalatedCount = tickets.filter(t => t.status === 'escalated').length;
+                const resolvedCount = tickets.filter(t => t.status === 'resolved').length;
+
+                document.getElementById('openTickets').textContent = openCount;
+                document.getElementById('pending').textContent = pendingCount;
+                document.getElementById('escalated').textContent = escalatedCount;
+                document.getElementById('resolved').textContent = resolvedCount;
+
+                const tbody = document.getElementById('ticketsBody');
+                tbody.innerHTML = '';
+
+                if (tickets.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="loading">No recent tickets.</td></tr>';
+                    return;
+                }
+
+                tickets.forEach(ticket => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><strong>#${ticket.id}</strong></td>
+                        <td>${customerMap[ticket.customer_id] || 'Unknown'}</td>
+                        <td>${ticket.subject}</td>
+                        <td><span class="badge badge-${ticket.priority}">${ticket.priority}</span></td>
+                        <td><span class="status status-${ticket.status}">${ticket.status}</span></td>
+                        <td>${formatDate(ticket.created_at)}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (err) {
+                console.error('Failed to load dashboard:', err);
+                document.getElementById('ticketsBody').innerHTML =
+                    '<tr><td colspan="6" class="loading">Unable to load ticket data.</td></tr>';
+            }
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+    </script>
+</body>
+</html>
