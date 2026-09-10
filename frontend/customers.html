@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXA AI Support - Customers</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <div class="logo-icon">N</div>
+                <span class="logo-text">NEXA</span>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="/" class="nav-item">
+                <i data-lucide="layout-dashboard"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="/assistant.html" class="nav-item">
+                <i data-lucide="bot"></i>
+                <span>AI Assistant</span>
+            </a>
+            <a href="/customers.html" class="nav-item active">
+                <i data-lucide="users"></i>
+                <span>Customers</span>
+            </a>
+            <a href="/settings.html" class="nav-item">
+                <i data-lucide="settings"></i>
+                <span>Settings</span>
+            </a>
+        </nav>
+    </aside>
+    <main class="main-content">
+        <header class="page-header">
+            <div>
+                <h1 class="page-title">Customers</h1>
+                <p class="page-subtitle">View and manage customer information.</p>
+            </div>
+        </header>
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">All Customers</h2>
+                <span class="card-count" id="customerCount">-</span>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Status</th>
+                            <th>Priority</th>
+                        </tr>
+                    </thead>
+                    <tbody id="customersBody">
+                        <tr><td colspan="5" class="loading">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Customer Detail Modal -->
+    <div class="modal-overlay" id="modalOverlay" onclick="closeModal()">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle">Customer Details</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            lucide.createIcons();
+            await loadCustomers();
+        });
+
+        async function loadCustomers() {
+            try {
+                const customers = await apiFetch('/api/customers');
+                document.getElementById('customerCount').textContent = customers.length + ' customers';
+
+                const tbody = document.getElementById('customersBody');
+                tbody.innerHTML = '';
+
+                if (customers.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="loading">No customers found.</td></tr>';
+                    return;
+                }
+
+                customers.forEach(customer => {
+                    const row = document.createElement('tr');
+                    row.style.cursor = 'pointer';
+                    row.onclick = () => showCustomerDetail(customer);
+                    row.innerHTML = `
+                        <td><strong>${customer.name}</strong></td>
+                        <td>${customer.email}</td>
+                        <td>${customer.phone || '-'}</td>
+                        <td><span class="status status-${customer.status}">${customer.status}</span></td>
+                        <td><span class="badge badge-${customer.support_priority}">${customer.support_priority}</span></td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (err) {
+                console.error('Failed to load customers:', err);
+                document.getElementById('customersBody').innerHTML =
+                    '<tr><td colspan="5" class="loading">Unable to load customer data.</td></tr>';
+            }
+        }
+
+        function showCustomerDetail(customer) {
+            document.getElementById('modalTitle').textContent = customer.name;
+            document.getElementById('modalBody').innerHTML = `
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <span class="detail-label">Email</span>
+                        <span class="detail-value">${customer.email}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Phone</span>
+                        <span class="detail-value">${customer.phone || '-'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Address</span>
+                        <span class="detail-value">${customer.address || '-'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Status</span>
+                        <span class="detail-value"><span class="status status-${customer.status}">${customer.status}</span></span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Support Priority</span>
+                        <span class="detail-value"><span class="badge badge-${customer.support_priority}">${customer.support_priority}</span></span>
+                    </div>
+                </div>
+            `;
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.remove('active');
+        }
+    </script>
+</body>
+</html>
